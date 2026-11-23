@@ -118,6 +118,33 @@ open(p, 'w').write(s)
 print('ecryptfs_dek.c patched: if-block re-indented with tabs')
 PYEOF
 
+echo "== patch duplicate const in msm pcm routing/voice =="
+# Run #4 failure: sound/soc/msm/qdsp6v2/msm-pcm-routing-v2.c:13405 has
+# "static const int const" (const written twice), GCC 9.2 reports
+# -Wduplicate-const, treated as a forbidden warning (error) by the wrapper.
+# The same file has 5 such lines (13405/13409/13413/13418/13422) and the
+# sibling msm-pcm-voice-v2.c:626 has one ("static const char const *").
+# Fix all of them at once — fixing only the first would fail again on the
+# next one. Removing the redundant second const changes nothing: the type
+# is identical. Verified counts on the local clone before writing this.
+python3 - <<'PYEOF'
+p = 'sound/soc/msm/qdsp6v2/msm-pcm-routing-v2.c'
+s = open(p).read()
+n = s.count('static const int const ')
+assert n == 5, f'expected 5 duplicate-const lines in {p}, found {n}'
+s = s.replace('static const int const ', 'static const int ')
+open(p, 'w').write(s)
+print('msm-pcm-routing-v2.c patched: 5 duplicate const removed')
+
+p = 'sound/soc/msm/qdsp6v2/msm-pcm-voice-v2.c'
+s = open(p).read()
+old = 'static const char const *tty_mode[]'
+assert old in s, f'{old} not found in {p}'
+s = s.replace(old, 'static const char *tty_mode[]')
+open(p, 'w').write(s)
+print('msm-pcm-voice-v2.c patched: 1 duplicate const removed')
+PYEOF
+
 echo "== toolchain =="
 aarch64-none-linux-gnu-gcc --version
 echo "== kernel version =="
