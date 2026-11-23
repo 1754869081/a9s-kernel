@@ -37,6 +37,35 @@ export CROSS_COMPILE=aarch64-none-linux-gnu-
 
 cd "$KERNEL_DIR"
 
+echo "== patch gcc-wrapper.py for Python 3 =="
+# The 4.4 tree's scripts/gcc-wrapper.py is Python 2 code (print >> sys.stderr
+# and byte-stream Popen). The Makefile runs it with $(PYTHON)=python, which
+# is Python 3 on ubuntu-24.04, so the first compile that produced any gcc
+# output crashed it (run #1: hw_breakpoint.o, TypeError). Convert the prints
+# and read stderr as text. Verified locally: py_compile passes and a smoke
+# test with a fake gcc still forwards warnings and exits 1 on a forbidden
+# warning, i.e. the script's intended behaviour is preserved.
+python3 - <<'PYEOF'
+p = 'scripts/gcc-wrapper.py'
+s = open(p).read()
+s = s.replace("proc = subprocess.Popen(args, stderr=subprocess.PIPE)",
+              "proc = subprocess.Popen(args, stderr=subprocess.PIPE, universal_newlines=True)")
+s = s.replace('print >> sys.stderr, "error, forbidden warning:", m.group(2)',
+              'print("error, forbidden warning:", m.group(2), file=sys.stderr)')
+s = s.replace('print >> sys.stderr, line,',
+              "print(line, file=sys.stderr, end='')")
+s = s.replace("print >> sys.stderr, args[0] + ':',e.strerror",
+              "print(args[0] + ':', e.strerror, file=sys.stderr)")
+s = s.replace("print >> sys.stderr, 'Is your PATH set correctly?'",
+              "print('Is your PATH set correctly?', file=sys.stderr)")
+s = s.replace("print >> sys.stderr, ' '.join(args), str(e)",
+              "print(' '.join(args), str(e), file=sys.stderr)")
+assert 'print >>' not in s, 'gcc-wrapper.py still has Python 2 print statements'
+assert 'universal_newlines=True' in s, 'gcc-wrapper.py Popen patch missing'
+open(p, 'w').write(s)
+print('gcc-wrapper.py patched to Python 3')
+PYEOF
+
 echo "== toolchain =="
 aarch64-none-linux-gnu-gcc --version
 echo "== kernel version =="
