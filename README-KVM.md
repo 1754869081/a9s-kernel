@@ -11,10 +11,11 @@
   （5933 行），只改了两处：`CONFIG_VIRTUALIZATION=y`、`CONFIG_KVM=y`，
   其余 KVM 依赖由 `olddefconfig` 自动补齐（本地已验证：原厂配置 0 项被丢弃，
   只多了 14 个 KVM 相关选项 + 1 个 ARM64 erratum 选项，没有任何值被改动）。
-- **工具链**：ARM GCC 9.2（`aarch64-none-linux-gnu`），从 developer.arm.com 下载。
-  选它是因为：原厂内核是用 GCC 4.9 编的，4.4 内核配 GCC 9 是同年代组合；
-  GCC 10 起默认 `-fno-common`，4.4 的代码会链接报错（多重定义），而这份源码里
-  没有 `-fcommon` 修复；GCC 9 仍默认 `-fcommon`，最可能一次编过。
+- **工具链**：GCC 4.9（`aarch64-linux-android-4.9`），从 Android NDK r17c 里取。
+  原厂内核就是用 GCC 4.9 编的，这是同代编译器。前 6 次用 ARM GCC 9.2 每次都
+  死在新版才有的警告上（缩进、重复 const、bool 比较……），每次修一个才暴露
+  下一个；GCC 4.9 根本不报这些警告，从根上断了这个循环。Linaro 的 4.9 包
+  现在下不到了，NDK r17c 是最后一个带 GCC 的 NDK，676 MB，是最小的可靠来源。
   备用方案：如果这条工具链下载失败或编译失败，改用 Ubuntu 24.04 自带的
   `gcc-aarch64-linux-gnu`（GCC 13），并在 `build-kvm.sh` 的 make 命令上加
   `KBUILD_CFLAGS="-fcommon"`。

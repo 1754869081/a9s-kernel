@@ -5,7 +5,7 @@
 # Inputs (env):
 #   KERNEL_DIR    - checked-out kernel source (riarumoda/kernel_samsung_a9y18qlte)
 #   CONFIG_FILE   - a9200-kvm.config (stock A9200 config + KVM, resolved)
-#   TOOLCHAIN_DIR - ARM GCC 9.2 install dir (bin/aarch64-none-linux-gnu-gcc)
+#   TOOLCHAIN_DIR - Android NDK r17c GCC 4.9 toolchain dir (bin/aarch64-linux-android-gcc)
 #   OUT_DIR       - where build outputs are collected
 #
 # Outputs in OUT_DIR:
@@ -33,7 +33,7 @@ OUT_DIR="${OUT_DIR:?OUT_DIR not set}"
 
 export PATH="$TOOLCHAIN_DIR/bin:$PATH"
 export ARCH=arm64
-export CROSS_COMPILE=aarch64-none-linux-gnu-
+export CROSS_COMPILE=aarch64-linux-android-
 
 cd "$KERNEL_DIR"
 
@@ -193,7 +193,7 @@ print('Makefile patched: 4 new-GCC warning classes disabled')
 PYEOF
 
 echo "== toolchain =="
-aarch64-none-linux-gnu-gcc --version
+aarch64-linux-android-gcc --version
 echo "== kernel version =="
 head -4 Makefile
 
