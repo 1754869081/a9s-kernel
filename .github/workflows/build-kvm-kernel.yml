@@ -9,14 +9,17 @@
 # from Image.gz + the recovered ramdisk/DTBs, and the user flashes it
 # himself via Odin, then checks whether /dev/kvm appears.
 #
-# Toolchain choice: ARM GCC 9.2 (gcc-arm-9.2-2019.12,
-# aarch64-none-linux-gnu), downloaded from developer.arm.com. Reasons:
-#  - the stock kernel was built with GCC 4.9; a 4.4 kernel is era-appropriate
-#    for GCC 9, which still defaults to -fcommon (GCC 10+ defaults to
-#    -fno-common and 4.4-era code then fails to link with multiple-definition
-#    errors), and the tree contains no -fcommon fix;
-#  - the repo's own build.config.aarch64 names the AOSP GCC 4.9 prebuilt,
-#    which is heavy to fetch; ARM's GCC 9.2 is a single ~200 MB tarball.
+# Toolchain choice: GCC 4.9 (aarch64-linux-android-4.9) from Android NDK r17c,
+# downloaded from dl.google.com. This is the SAME compiler generation Samsung
+# used to build the stock 4.4.205 kernel. We first tried ARM GCC 9.2 (runs
+# #1-#6): every run died on a different warning class that GCC 9 emits on
+# 2018-era code (misleading-indentation, duplicate-decl-specifier,
+# bool-compare, ...) and that the tree's gcc-wrapper.py treats as a fatal
+# error — a new one each run, because the build stops at the first error.
+# GCC 4.9 never emits those warning classes, so it ends the whack-a-mole.
+# (Linaro's 4.9 tarballs are no longer hosted; NDK r17c is the last NDK
+# with GCC and its 676 MB zip is the smallest reliable source.)
+# Only the aarch64 4.9 toolchain subtree is extracted from the NDK zip.
 # Fallback (if this toolchain download or the build fails): Ubuntu 24.04's
 # gcc-aarch64-linux-gnu (GCC 13) with KBUILD_CFLAGS="-fcommon" added to the
 # make invocations in build-kvm.sh. See README.md.
@@ -39,7 +42,7 @@ on:
 
 env:
   KERNEL_REPO: https://github.com/riarumoda/kernel_samsung_a9y18qlte.git
-  TOOLCHAIN_URL: https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz
+  TOOLCHAIN_URL: https://dl.google.com/android/repository/android-ndk-r17c-linux-x86_64.zip
 
 jobs:
   build:
@@ -66,15 +69,16 @@ jobs:
             build-essential bc bison flex \
             libssl-dev libelf-dev \
             device-tree-compiler \
-            cpio xz-utils kmod rsync
+            cpio xz-utils unzip kmod rsync
 
-      - name: Download ARM GCC 9.2 toolchain
+      - name: Download GCC 4.9 toolchain (Android NDK r17c)
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/toolchain"
-          curl -L --fail --retry 3 -o /tmp/gcc-arm-9.2.tar.xz "$TOOLCHAIN_URL"
-          tar -xf /tmp/gcc-arm-9.2.tar.xz -C "$GITHUB_WORKSPACE/toolchain" --strip-components=1
-          "$GITHUB_WORKSPACE/toolchain/bin/aarch64-none-linux-gnu-gcc" --version
-          rm /tmp/gcc-arm-9.2.tar.xz
+          curl -L --fail --retry 3 -o /tmp/ndk-r17c.zip "$TOOLCHAIN_URL"
+          # Extract only the aarch64 GCC 4.9 toolchain subtree (the full NDK
+          # is ~3 GB extracted; we need just this ~300 MB toolchain).
+          unzip -q /tmp/ndk-r17c.zip "android-ndk-r17c/toolchains/aarch64-linux-android-4.9/*" -d "$GITHUB_WORKSPACE/ndk"
+          "$GITHUB_WORKSPACE/ndk/android-ndk-r17c/toolchains/aarch64-linux-android-4.9/prebuilt/linux-x86_64/bin/aarch64-linux-android-gcc" --version
+          rm /tmp/ndk-r17c.zip
 
       - name: Clone kernel source (shallow)
         run: |
@@ -89,7 +93,7 @@ jobs:
         env:
           KERNEL_DIR: ${{ github.workspace }}/kernel
           CONFIG_FILE: ${{ github.workspace }}/a9200-kvm.config
-          TOOLCHAIN_DIR: ${{ github.workspace }}/toolchain
+          TOOLCHAIN_DIR: ${{ github.workspace }}/ndk/android-ndk-r17c/toolchains/aarch64-linux-android-4.9/prebuilt/linux-x86_64
           OUT_DIR: ${{ github.workspace }}/out
 
       - name: Show artifacts
