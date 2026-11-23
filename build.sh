@@ -108,5 +108,5 @@ rm -rf "$PWD/../modules-staging"
 } > "$OUT_DIR/BUILD_INFO.txt"
 
 echo "=== artifacts ==="
-ls -lh "$OUT_DIR" "$OUT_DIR/dtbs" | head -60
+ls -lh "$OUT_DIR" "$OUT_DIR/dtbs" | head -60 || true
 echo "BUILD OK"
