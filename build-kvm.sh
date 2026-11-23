@@ -66,6 +66,25 @@ open(p, 'w').write(s)
 print('gcc-wrapper.py patched to Python 3')
 PYEOF
 
+echo "== patch kvm_mmu.h: cpuid_feature_extract_field needs 3 args =="
+# Run #2 failure: arch/arm64/include/asm/kvm_mmu.h:309 calls
+# cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) with 2 args,
+# but cpufeature.h declares it with 3: (u64 features, int field, bool sign).
+# Every other call site in the tree passes a third arg. VMIDBITS is an
+# unsigned field (0/1 = 8-bit VMID, 2 = 16-bit), so sign = false.
+# The "control reaches end of non-void function" warning at line 310 was a
+# consequence of the broken return statement and goes away with this fix.
+python3 - <<'PYEOF'
+p = 'arch/arm64/include/asm/kvm_mmu.h'
+s = open(p).read()
+old = 'return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;'
+new = 'return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT, false) == 2) ? 16 : 8;'
+assert old in s, 'kvm_mmu.h call site not found (already patched?)'
+s = s.replace(old, new)
+open(p, 'w').write(s)
+print('kvm_mmu.h patched: cpuid_feature_extract_field now takes false (unsigned)')
+PYEOF
+
 echo "== toolchain =="
 aarch64-none-linux-gnu-gcc --version
 echo "== kernel version =="
