@@ -85,6 +85,39 @@ open(p, 'w').write(s)
 print('kvm_mmu.h patched: cpuid_feature_extract_field now takes false (unsigned)')
 PYEOF
 
+echo "== patch ecryptfs_dek.c: misleading indentation =="
+# Run #3 failure: fs/ecryptfs/ecryptfs_dek.c:368 — the if() and its body in
+# ecryptfs_update_crypt_flag are indented with spaces (4/8) while the rest
+# of the function uses tabs, so the following mutex_lock() (1 tab = 8 cols)
+# lines up with the if-body and GCC 9.2 reports -Wmisleading-indentation,
+# which the wrapper script treats as a forbidden warning (error). The stock
+# GCC 4.9 never emitted this warning class. Fix: re-indent the block with
+# tabs like the rest of the function (no logic change).
+python3 - <<'PYEOF'
+p = 'fs/ecryptfs/ecryptfs_dek.c'
+s = open(p).read()
+old = (
+    "    /*\n"
+    "     * To update metadata we need to make sure keysig_list contains fekek.\n"
+    "     * Because our EDEK is stored along with key for protected file.\n"
+    "     */\n"
+    "    if(list_empty(&crypt_stat->keysig_list))\n"
+    "        ecryptfs_dek_copy_mount_wide_sigs_to_inode_sigs(crypt_stat, mount_crypt_stat);\n"
+)
+new = (
+    "\t/*\n"
+    "\t * To update metadata we need to make sure keysig_list contains fekek.\n"
+    "\t * Because our EDEK is stored along with key for protected file.\n"
+    "\t */\n"
+    "\tif(list_empty(&crypt_stat->keysig_list))\n"
+    "\t\tecryptfs_dek_copy_mount_wide_sigs_to_inode_sigs(crypt_stat, mount_crypt_stat);\n"
+)
+assert old in s, 'ecryptfs_dek.c block not found (already patched?)'
+s = s.replace(old, new)
+open(p, 'w').write(s)
+print('ecryptfs_dek.c patched: if-block re-indented with tabs')
+PYEOF
+
 echo "== toolchain =="
 aarch64-none-linux-gnu-gcc --version
 echo "== kernel version =="
